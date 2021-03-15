@@ -10,7 +10,7 @@ ENV NETSIZE 2mbit
 ENV NETDELAY 50ms
 ENV NETBURST 100000
 
-COPY docker-entrypoint.sh /usr/local/bin/
+COPY docker-entrypoint-extend.sh /usr/local/bin/
 
 RUN rabbitmq-plugins enable --offline rabbitmq_management rabbitmq_stomp rabbitmq_web_stomp
 
@@ -37,9 +37,8 @@ RUN set -eux; \
 	[ -s /usr/local/bin/rabbitmqadmin ]; \
 	chmod +x /usr/local/bin/rabbitmqadmin; \
 	apk add --no-cache python3 iproute2; \
-	ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh; \
 	rabbitmqadmin --version
 
 EXPOSE 15671 15672 15674
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["docker-entrypoint-extend.sh"]

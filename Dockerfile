@@ -31,6 +31,11 @@ ENV OTP_VERSION 23.2.7
 # https://erlang.org/pipermail/erlang-questions/2019-January/097067.html
 ENV OTP_SOURCE_SHA256="31201e8b4af1c242eb613636cf29c0e6cc78c5702446f238f1b9715ac9aea06b"
 
+# 网络限制
+ENV NETSIZE 2mbit
+ENV NETDELAY 50ms
+ENV NETBURST 100000
+
 # Install dependencies required to build Erlang/OTP from source
 # https://erlang.org/doc/installation_guide/INSTALL.html
 # autoconf: Required to configure Erlang/OTP before compiling
@@ -236,11 +241,12 @@ RUN set -eux; \
 
 # Enable Prometheus-style metrics by default (https://github.com/docker-library/rabbitmq/issues/419)
 RUN set -eux; \
-	rabbitmq-plugins enable --offline rabbitmq_prometheus; \
+	rabbitmq-plugins enable --offline rabbitmq_prometheus rabbitmq_management rabbitmq_stomp rabbitmq_web_stomp; \
 	echo 'management_agent.disable_metrics_collector = true' > /etc/rabbitmq/conf.d/management_agent.disable_metrics_collector.conf
 
 # Added for backwards compatibility - users can simply COPY custom plugins to /plugins
-RUN ln -sf /opt/rabbitmq/plugins /plugins
+RUN ln -sf /opt/rabbitmq/plugins /plugins; \
+	rm -f /etc/rabbitmq/conf.d/management_agent.disable_metrics_collector.conf
 
 # set home so that any `--user` knows where to put the erlang cookie
 ENV HOME $RABBITMQ_DATA_DIR
@@ -252,8 +258,30 @@ VOLUME $RABBITMQ_DATA_DIR
 # https://docs.docker.com/samples/library/ubuntu/#locales
 ENV LANG=C.UTF-8 LANGUAGE=C.UTF-8 LC_ALL=C.UTF-8
 
+# extract "rabbitmqadmin" from inside the "rabbitmq_management-X.Y.Z.ez" plugin zipfile
+# see https://github.com/docker-library/rabbitmq/issues/207
+RUN set -eux; \
+	erl -noinput -eval ' \
+		{ ok, AdminBin } = zip:foldl(fun(FileInArchive, GetInfo, GetBin, Acc) -> \
+			case Acc of \
+				"" -> \
+					case lists:suffix("/rabbitmqadmin", FileInArchive) of \
+						true -> GetBin(); \
+						false -> Acc \
+					end; \
+				_ -> Acc \
+			end \
+		end, "", init:get_plain_arguments()), \
+		io:format("~s", [ AdminBin ]), \
+		init:stop(). \
+	' -- /plugins/rabbitmq_management-*.ez > /usr/local/bin/rabbitmqadmin; \
+	[ -s /usr/local/bin/rabbitmqadmin ]; \
+	chmod +x /usr/local/bin/rabbitmqadmin; \
+	apk add --no-cache python3 iproute2; \
+	rabbitmqadmin --version
+
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
 
-EXPOSE 4369 5671 5672 15691 15692 25672
+EXPOSE 4369 5671 5672 15691 15692 25672 15671 15672 15674
 CMD ["rabbitmq-server"]

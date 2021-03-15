@@ -36,9 +36,10 @@ RUN set -eux; \
 	' -- /plugins/rabbitmq_management-*.ez > /usr/local/bin/rabbitmqadmin; \
 	[ -s /usr/local/bin/rabbitmqadmin ]; \
 	chmod +x /usr/local/bin/rabbitmqadmin; \
+	chmod +x /usr/local/bin/docker-entrypoint-extend.sh; \
 	apk add --no-cache python3 iproute2; \
 	rabbitmqadmin --version
 
 EXPOSE 15671 15672 15674
 
-ENTRYPOINT ["docker-entrypoint-extend.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-extend.sh"]

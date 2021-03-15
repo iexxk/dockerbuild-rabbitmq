@@ -1,12 +1,15 @@
-FROM rabbitmq:3.7-alpine
+#
+# NOTE: THIS DOCKERFILE IS GENERATED VIA "apply-templates.sh"
+#
+# PLEASE DO NOT EDIT IT DIRECTLY.
+#
 
-ENV NETSIZE 2mbit
-ENV NETDELAY 50ms
-ENV NETBURST 100000 
+FROM rabbitmq:3.8-alpine
 
-COPY docker-entrypoint.sh /usr/local/bin/
+RUN rabbitmq-plugins enable --offline rabbitmq_management
 
-RUN rabbitmq-plugins enable --offline rabbitmq_management rabbitmq_stomp rabbitmq_web_stomp
+# make sure the metrics collector is re-enabled (disabled in the base image for Prometheus-style metrics by default)
+RUN rm -f /etc/rabbitmq/conf.d/management_agent.disable_metrics_collector.conf
 
 # extract "rabbitmqadmin" from inside the "rabbitmq_management-X.Y.Z.ez" plugin zipfile
 # see https://github.com/docker-library/rabbitmq/issues/207
@@ -27,11 +30,7 @@ RUN set -eux; \
 	' -- /plugins/rabbitmq_management-*.ez > /usr/local/bin/rabbitmqadmin; \
 	[ -s /usr/local/bin/rabbitmqadmin ]; \
 	chmod +x /usr/local/bin/rabbitmqadmin; \
-	apk add --no-cache python iproute2; \
-	ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh \
+	apk add --no-cache python3; \
 	rabbitmqadmin --version
-	
 
-EXPOSE 15671 15672 15674
-
-ENTRYPOINT ["docker-entrypoint.sh"]
+EXPOSE 15671 15672
